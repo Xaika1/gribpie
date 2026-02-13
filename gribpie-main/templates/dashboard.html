@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Панель управления - GribPie{% endblock %}
+{% block content %}
+<h1>Мои проекты</h1>
+
+<div class="card-grid">
+    <div class="project-card">
+        <h3>Создать новый проект</h3>
+        <form method="POST" action="{{ url_for('create_project') }}">
+            <input type="text" name="name" placeholder="Название проекта" required minlength="3">
+            <button type="submit" class="button success">Создать проект</button>
+        </form>
+    </div>
+    
+    <div class="project-card" style="background: var(--light);">
+        <h3>Все мои файлы</h3>
+        <p>Просмотр и управление всеми файлами из всех проектов</p>
+        <a href="{{ url_for('all_files') }}" class="button primary" style="margin-top: 10px;">Открыть список файлов</a>
+    </div>
+</div>
+
+<div class="projects-section">
+    <div class="project-section">
+        <h2 class="project-section-title">Личные проекты</h2>
+        {% if personal_projects %}
+        <div class="project-list">
+            {% for project in personal_projects %}
+            <div class="project-card">
+                <div class="project-header">
+                    <span class="project-name">{{ project.name }}</span>
+                    <span class="storage-info">
+                        Использовано: {{ project.storage_used|format_size }} из {{ 262144000|format_size }}
+                    </span>
+                </div>
+                
+                <div class="upload-form">
+                    <form method="POST" action="{{ url_for('upload_file', project_id=project.id) }}" enctype="multipart/form-data" onsubmit="return validateFileSize({{ project.storage_used }}, {{ 262144000 - project.storage_used }})">
+                        <input type="file" name="file" id="file-{{ project.id }}" required onchange="checkFileSize(this, {{ 262144000 - project.storage_used }})">
+                        <button type="submit" class="button primary">Загрузить файл</button>
+                    </form>
+                </div>
+                
+                {% set files = project.files %}
+                {% if files %}
+                <div class="file-list">
+                    <h4>Файлы ({{ files|length }}):</h4>
+                    {% for file in files %}
+                    <div class="file-item">
+                        <div class="file-details">
+                            <div class="file-icon">
+                                <i>📄</i>
+                            </div>
+                            <div class="file-name">
+                                {{ file.filename }}
+                            </div>
+                            <div class="file-size">
+                                ({{ file.size|format_size }})
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <a href="{{ url_for('download_file', file_id=file.id) }}" class="button secondary">
+                                Скачать
+                            </a>
+                            <a href="{{ url_for('delete_file', file_id=file.id) }}" class="button danger" onclick="return confirm('Удалить файл?')">
+                                Удалить
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <div class="share-section">
+                    <h4>Поделиться проектом</h4>
+                    <div class="share-link">
+                        <input type="text" id="share-link-{{ project.id }}" readonly placeholder="Ссылка для доступа">
+                        <button class="button secondary" onclick="getShareLink({{ project.id }})">Получить ссылку</button>
+                        <button class="button success" onclick="generateQR({{ project.id }})">Сделать QR</button>
+                        <button class="button danger" onclick="deleteProject({{ project.id }}, '{{ project.name }}')" style="margin-top: 10px;">
+                            Удалить проект
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p>У вас пока нет личных проектов. Создайте первый!</p>
+        {% endif %}
+    </div>
+    
+    {% if shared_projects %}
+    <div class="project-section">
+        <h2 class="project-section-title">Доступные проекты</h2>
+        <div class="project-list">
+            {% for item in shared_projects %}
+            <div class="project-card">
+                <div class="project-header">
+                    <span class="project-name">{{ item.project.name }}</span>
+                    <span class="project-access">Доступ: {{ item.access_level }}</span>
+                </div>
+                
+                <div class="upload-form">
+                    {% if item.access_level == 'edit' %}
+                    <form method="POST" action="{{ url_for('upload_file', project_id=item.project.id) }}" enctype="multipart/form-data" onsubmit="return validateFileSize({{ item.project.storage_used }}, {{ 262144000 - item.project.storage_used }})">
+                        <input type="file" name="file" id="file-{{ item.project.id }}" required onchange="checkFileSize(this, {{ 262144000 - item.project.storage_used }})">
+                        <button type="submit" class="button primary">Загрузить файл</button>
+                    </form>
+                    {% else %}
+                    <p>Вы можете только просматривать файлы в этом проекте</p>
+                    {% endif %}
+                </div>
+                
+                {% set files = item.project.files %}
+                {% if files %}
+                <div class="file-list">
+                    <h4>Файлы ({{ files|length }}):</h4>
+                    {% for file in files %}
+                    <div class="file-item">
+                        <div class="file-details">
+                            <div class="file-icon">
+                                <i>📄</i>
+                            </div>
+                            <div class="file-name">
+                                {{ file.filename }}
+                            </div>
+                            <div class="file-size">
+                                ({{ file.size|format_size }})
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <a href="{{ url_for('download_file', file_id=file.id) }}" class="button secondary">
+                                Скачать
+                            </a>
+                            {% if item.access_level == 'edit' %}
+                            <a href="{{ url_for('delete_file', file_id=file.id) }}" class="button danger" onclick="return confirm('Удалить файл?')">
+                                Удалить
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div id="qr-modal" class="qr-modal" style="display: none;">
+    <div class="qr-modal-content">
+        <h3>QR-код для доступа к проекту</h3>
+        <div id="qr-container" class="qr-container"></div>
+        <div class="qr-url-container">
+            <input type="text" id="qr-url" class="qr-url" readonly>
+        </div>
+        <div class="qr-actions">
+            <button class="button secondary" onclick="copyQRToClipboard()">Копировать ссылку</button>
+            <button class="button primary" onclick="closeQRModal()">Закрыть</button>
+        </div>
+        <p class="qr-instruction">Отсканируйте QR-код камерой телефона для быстрого доступа</p>
+    </div>
+</div>
+
+<div id="error-modal" class="error-modal" style="display: none;">
+    <div class="error-modal-content">
+        <h3>Ошибка загрузки файла</h3>
+        <p id="error-message">Ошибка загрузки файла</p>
+        <button class="button primary" onclick="closeErrorModal()">Закрыть</button>
+    </div>
+</div>
+
+<script>
+function getShareLink(projectId) {
+    fetch(`/get_share_link/${projectId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.url) {
+                document.getElementById(`share-link-${projectId}`).value = data.url;
+                document.getElementById(`share-link-${projectId}`).select();
+                document.execCommand('copy');
+                alert('Ссылка скопирована в буфер обмена!');
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Произошла ошибка при получении ссылки');
+        });
+}
+
+function generateQR(projectId) {
+    fetch(`/get_share_link/${projectId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.token) {
+                fetch(`/generate_qr/${data.token}`)
+                    .then(response => response.json())
+                    .then(qrData => {
+                        document.getElementById('qr-url').value = qrData.url;
+                        document.getElementById('qr-container').innerHTML = `<img src="${qrData.qr_data}" alt="QR Code">`;
+                        document.getElementById('qr-modal').style.display = 'block';
+                    });
+            }
+        });
+}
+
+function closeQRModal() {
+    document.getElementById('qr-modal').style.display = 'none';
+}
+
+function copyQRToClipboard() {
+    const url = document.getElementById('qr-url').value;
+    navigator.clipboard.writeText(url).then(() => {
+        alert('Ссылка скопирована в буфер обмена!');
+    });
+}
+
+function deleteProject(projectId, projectName) {
+    if (confirm(`Вы уверены, что хотите удалить проект "${projectName}"? Все файлы будут удалены!`)) {
+        window.location.href = `/delete_project/${projectId}`;
+    }
+}
+
+function checkFileSize(input, remainingSpace) {
+    const file = input.files[0];
+    const maxSize = 262144000;
+    
+    if (file.size > remainingSpace) {
+        showError(`Файл слишком большой. Осталось только ${formatSize(remainingSpace)} свободного места в проекте.`);
+        input.value = '';
+        return false;
+    }
+    
+    if (file.size > maxSize) {
+        showError(`Максимальный размер файла: 250 МБ`);
+        input.value = '';
+        return false;
+    }
+    
+    return true;
+}
+
+function validateFileSize(usedSpace, remainingSpace) {
+    const fileInput = document.querySelector(`input[name="file"]`);
+    if (fileInput && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        if (file.size > remainingSpace) {
+            showError(`Недостаточно места на сервере. Осталось только ${formatSize(remainingSpace)}.`);
+            return false;
+        }
+    }
+    return true;
+}
+
+function showError(message) {
+    document.getElementById('error-message').textContent = message;
+    document.getElementById('error-modal').style.display = 'flex';
+}
+
+function closeErrorModal() {
+    document.getElementById('error-modal').style.display = 'none';
+}
+
+function formatSize(bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' ГБ';
+    } else if (bytes >= 1024 * 1024) {
+        return (bytes / (1024 * 1024)).toFixed(2) + ' МБ';
+    } else if (bytes >= 1024) {
+        return (bytes / 1024).toFixed(2) + ' КБ';
+    } else {
+        return bytes + ' Б';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Вход - GribPie{% endblock %}
+{% block content %}
+<h1>Вход в систему</h1>
+<form method="POST">
+    <input type="text" name="username" placeholder="Имя пользователя" required>
+    <input type="password" name="password" placeholder="Пароль" required>
+    <button type="submit" class="button primary">Войти</button>
+</form>
+<p>Нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрироваться</a></p>
+{% endblock %}
